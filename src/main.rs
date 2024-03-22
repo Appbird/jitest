@@ -53,13 +53,10 @@ fn error_report(header_name:&str, detail:&str) {
     eprintln!("{detail}");
 }
 
-fn main() {
-    env_logger::init();
-    let term:Term = Term::stdout();
-    let args = CLI::parse();
-    let re = Regex::new(r"test(?P<suffix>[0-9]*)").unwrap();
+fn enumrate_test_cases(target_directory:&str) -> Vec<String> {
     let mut test_cases = Vec::<String>::new();
-    let entries = fs::read_dir(&args.target).unwrap();
+    let re = Regex::new(r"test(?P<suffix>[0-9]*)").unwrap();
+    let entries = fs::read_dir(target_directory).unwrap();
     
     for entry in entries {
         let correct_entry   = entry.unwrap();
@@ -69,9 +66,27 @@ fn main() {
             test_cases.push(captures["suffix"].to_string())
         }
     }
+    return test_cases
+}
+
+fn display_cases(input_path:&str, output_path:&str, exp_path:&str) {
+    let input_txt       = fs::read_to_string(&input_path).unwrap();
+    let output_txt      = fs::read_to_string(&output_path).unwrap_or_default();
+    let expected_txt    = fs::read_to_string(&exp_path).unwrap();
+    println!("{} {}\n{}", "[in]".bold(),  &input_path, &input_txt);
+    println!("{} {}\n{}", "[out]".bold(), &output_path, &output_txt);
+    println!("{} {}\n{}", "[exp]".bold(), &exp_path, &expected_txt);
+}
+
+fn main() {
+    env_logger::init();
+    let term:Term = Term::stdout();
+    let args = CLI::parse();
     
+    let test_cases = enumrate_test_cases(&args.target);
     let testcase_count = test_cases.len();
     println!("{} test cases exists", test_cases.len());
+
     let compile_file    = format!("{}/p.cpp", &args.target);
     let exec_file       = format!("{}/p.out", &args.target);
     compile(&compile_file, &exec_file).unwrap_or_else(
@@ -97,16 +112,11 @@ fn main() {
         );
         term.clear_last_lines(1).unwrap();
         if diff_result.status.success() {
-            println!("{} #{}", "[Accepted]".on_green().white().bold(), testcase_number);
+            println!("{} #{}", "[ Accepted ]".on_green().white().bold(), testcase_number);
             accepted_count += 1;
         } else {
-            println!("{} #{}", "[Wrong Answer]".on_yellow().white().bold(), testcase_number);
-            let input_txt       = fs::read_to_string(&input).unwrap();
-            let output_txt      = fs::read_to_string(&output).unwrap_or_default();
-            let expected_txt    = fs::read_to_string(&expected).unwrap();
-            println!("{} {}\n{}", "[in]".bold(),  &input, &input_txt);
-            println!("{} {}\n{}", "[out]".bold(), &output, &output_txt);
-            println!("{} {}\n{}", "[exp]".bold(), &expected, &expected_txt);
+            println!("{} #{}", "[ Wrong Answer ]".on_yellow().white().bold(), testcase_number);
+            display_cases(&input, &output, &expected);
         }
     }
     if accepted_count == testcase_count {
