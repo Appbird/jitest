@@ -31,9 +31,9 @@
 ```
 jitest [OPTIONS] <target directory> 
 ```
+- `<target directory>`に含まれるテストケース全てを`<target directory>/p.cpp`が満たすかをチェックします。
 - `<target directory>`には、入力例`test*`・出力例`exp*`・プログラム`p.cpp`を子に持つディレクトリを指定します。
   - (`test1`, `exp1`)のように、末尾の対応したファイル2つ組を1テストケースにおける入出力例とみなします。
-  
 
 より詳細には、以下の手順を踏んで実行されます。
 1.  ユーザは入力例`test*`・出力例`exp*`・プログラム`p.cpp`を子に持つディレクトリの名前を引数に指定します。
