@@ -1,52 +1,29 @@
-use std::{fs::{self, File}, process::{exit, Command, Output, Stdio}};
+mod cmd;
+
+use std::{fs, process::exit};
 use colored::*;
 use console::Term;
 use clap::Parser;
 use regex::{self, Regex};
+use std::time::Instant;
+
+use cmd::*;
 
 #[derive(Parser)]
+#[command(author, version, about, long_about)]
 struct CLI {
-    // path to directory which includes test target (such as `a.out`).
+    /// path to directory which includes test target (such as `a.out`).
     target:String,
+    
+    /// whether this program add -B option when executing diff
     #[arg(short = 'B', long)]
     ignore_blank_lines:bool,
+
+    /// whether you give input manually
     #[arg(short = 'd', long)]
     direct_input:bool
 }
 
-type OutputThrowable = Result<Output, std::io::Error>;
-
-fn compile(file:&str, out:&str) -> OutputThrowable{
-    Command::new("g++")
-        .arg("-Wall")
-        .arg("-Wextra")
-        .arg("--std=c++20")
-        .arg("-o")
-            .arg(out)
-        .arg(file)
-        .output()
-}
-fn execute(file:&str, input:&str, output:&str) -> OutputThrowable{
-    let input_file = File::open(input).unwrap();
-    let output_file = File::create(output).unwrap();
-    Command::new(file)
-        .stdin(Stdio::from(input_file))
-        .stdout(Stdio::from(output_file))
-        .output()
-}
-fn execute_direct(file:&str) -> OutputThrowable{
-    Command::new(file)
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .output()
-}
-fn diff(expected:&str, actual:&str, ignore_blank_lines:bool) -> OutputThrowable {
-    let mut cmd = Command::new("diff");
-    cmd.args([actual, expected]);
-    if ignore_blank_lines { cmd.arg("-B"); }
-    
-    cmd.output()
-}
 fn error_report(header_name:&str, detail:&str) {
     let header_text = format!("[[{}]]", header_name);
     eprintln!("{}", header_text.underline().bold().red());
@@ -69,13 +46,15 @@ fn enumrate_test_cases(target_directory:&str) -> Vec<String> {
     return test_cases
 }
 
-fn display_cases(input_path:&str, output_path:&str, exp_path:&str) {
+fn display_cases(input_path:&str, output_path:&str, exp_path:&str, err_path:&str) {
     let input_txt       = fs::read_to_string(&input_path).unwrap();
     let output_txt      = fs::read_to_string(&output_path).unwrap_or_default();
     let expected_txt    = fs::read_to_string(&exp_path).unwrap();
-    println!("{} {}\n{}", "[in]".bold(),  &input_path, &input_txt);
-    println!("{} {}\n{}", "[out]".bold(), &output_path, &output_txt);
-    println!("{} {}\n{}", "[exp]".bold(), &exp_path, &expected_txt);
+    
+    println!("{} {}\n{}", "[in]".underline().bold(),  &input_path, &input_txt);
+    println!("{} {}\n{}", "[out]".underline().bold(), &output_path, &output_txt);
+    println!("{} {}\n{}", "[exp]".underline().bold(), &exp_path, &expected_txt);
+    println!("{} -> {}\n\n", "[err]".underline().bold(), &err_path);
 }
 
 fn test_with_cases(
@@ -88,31 +67,34 @@ fn test_with_cases(
     let mut accepted_count = 0;
     for (number, case) in test_cases.iter().enumerate() {
         let testcase_number = number + 1;
-        let input       = format!("{}/test{}", &args.target, case);
-        let output      = format!("{}/out{}", &args.target, case);
-        let expected    = format!("{}/exp{}", &args.target, case);
+        let input       = format!("{}/test{case}", &args.target);
+        let output      = format!("{}/out{case}", &args.target);
+        let expected    = format!("{}/exp{case}", &args.target);
+        let errput      = format!("{}/err{case}", &args.target);
 
-        println!("{} #{}", "[ Waiting Judge ... ]".on_white().black().bold(), testcase_number);
+        println!("{} #{}", "[ WJ ]".on_white().black().bold(), testcase_number);
+        let start_time = Instant::now();
         {
-            execute(&exec_file, &input, &output).unwrap_or_else(
+            execute(&exec_file, &input, &output, &errput).unwrap_or_else(
                 |e| { error_report("Runtime Error", &e.to_string()); exit(1); }
             );
         }
+        let duration = start_time.elapsed();
         
         let diff_result = diff(&expected, &output, args.ignore_blank_lines).unwrap_or_else(
             |e| { error_report("Failed to compare", &e.to_string()); exit(1); }
         );
         term.clear_last_lines(1).unwrap();
         if diff_result.status.success() {
-            println!("{} #{}", "[ Accepted ]".on_green().white().bold(), testcase_number);
+            println!("{} #{testcase_number} -- {:.3} sec", "[ AC ]".on_green().white().bold(), duration.as_secs_f64());
             accepted_count += 1;
         } else {
-            println!("{} #{}", "[ Wrong Answer ]".on_yellow().white().bold(), testcase_number);
-            display_cases(&input, &output, &expected);
+            println!("{} #{testcase_number} -- {:.3} sec", "[ WA ]".on_yellow().white().bold(), duration.as_secs_f64());
+            display_cases(&input, &output, &expected, &errput);
         }
     }
     if accepted_count == testcase_count {
-        println!("\n{}", "[[✅ All accepted!]]".green().bold().underline());
+        println!("\n{}", "[[✅ All Accepted!]]".green().bold().underline());
     }
 }
 
@@ -129,7 +111,11 @@ fn main() {
     compile(&compile_file, &exec_file).unwrap_or_else(
         |e| { error_report("Compile Error", &e.to_string()); exit(1); }
     );
-    test_with_cases(&term, &test_cases, &args, &exec_file);
-    
+    println!("\n{}\n", "[[✅ Compile Completed]]".green().bold().underline());
+    if args.direct_input {
+        execute_direct(&exec_file).unwrap();
+    } else {
+        test_with_cases(&term, &test_cases, &args, &exec_file);
+    }
     
 }

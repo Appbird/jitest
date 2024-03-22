@@ -1,5 +1,6 @@
 [package]
 name = "jitest"
+description = "a simple tester for single-file programs"
 version = "0.1.0"
 edition = "2021"
 
