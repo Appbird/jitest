@@ -104,7 +104,7 @@ fn main() {
     let args = CLI::parse();
     
     let test_cases = enumrate_test_cases(&args.target);
-    println!("{} test cases exists", test_cases.len());
+    println!("{} test cases exist", test_cases.len());
 
     let compile_file    = format!("{}/p.cpp", &args.target);
     let exec_file       = format!("{}/p.out", &args.target);
