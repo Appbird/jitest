@@ -78,21 +78,13 @@ fn display_cases(input_path:&str, output_path:&str, exp_path:&str) {
     println!("{} {}\n{}", "[exp]".bold(), &exp_path, &expected_txt);
 }
 
-fn main() {
-    env_logger::init();
-    let term:Term = Term::stdout();
-    let args = CLI::parse();
-    
-    let test_cases = enumrate_test_cases(&args.target);
+fn test_with_cases(
+    term:&Term,
+    test_cases:&Vec<String>,
+    args:&CLI,
+    exec_file:&str
+) {
     let testcase_count = test_cases.len();
-    println!("{} test cases exists", test_cases.len());
-
-    let compile_file    = format!("{}/p.cpp", &args.target);
-    let exec_file       = format!("{}/p.out", &args.target);
-    compile(&compile_file, &exec_file).unwrap_or_else(
-        |e| { error_report("Compile Error", &e.to_string()); exit(1); }
-    );
-    
     let mut accepted_count = 0;
     for (number, case) in test_cases.iter().enumerate() {
         let testcase_number = number + 1;
@@ -122,7 +114,22 @@ fn main() {
     if accepted_count == testcase_count {
         println!("\n{}", "[[✅ All accepted!]]".green().bold().underline());
     }
+}
+
+fn main() {
+    env_logger::init();
+    let term:Term = Term::stdout();
+    let args = CLI::parse();
     
+    let test_cases = enumrate_test_cases(&args.target);
+    println!("{} test cases exists", test_cases.len());
+
+    let compile_file    = format!("{}/p.cpp", &args.target);
+    let exec_file       = format!("{}/p.out", &args.target);
+    compile(&compile_file, &exec_file).unwrap_or_else(
+        |e| { error_report("Compile Error", &e.to_string()); exit(1); }
+    );
+    test_with_cases(&term, &test_cases, &args, &exec_file);
     
     
 }
